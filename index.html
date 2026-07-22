@@ -548,12 +548,57 @@ body::before {
 
 /* mobile */
 @media(max-width:600px){
-  .sidebar { width: 54px; }
-  .main { margin-left: 54px; }
-  .botbar { left: 54px; }
+  body { font-size: 13px; }
+  .sidebar { display: none; }
+  .main { margin-left: 0; width: 100%; }
+  .topbar {
+    height: auto; min-height: 54px; padding: 7px 8px; gap: 3px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  }
+  .topbar::-webkit-scrollbar { display: none; }
+  .tb { padding: 8px 9px; font-size: 12px; flex: 0 0 auto; }
+  .tb-right { display: none; }
+  .page { padding: 15px 10px 84px; }
+  .ph { margin-bottom: 16px; gap: 10px; }
   .ph h1 { font-size: 30px; }
+  .ph-left, .ph > div { min-width: 0; width: 100%; }
+  .ph .btn-row, .ph > .btn { width: 100%; }
+  .ph .btn-row .btn, .ph > .btn { flex: 1 1 150px; justify-content: center; }
+  .sg { gap: 8px; margin-bottom: 14px; }
+  .sc { padding: 14px 12px; min-width: 0; }
+  .sl { font-size: 10px; margin-bottom: 7px; }
+  .sv { font-size: 34px; }
+  .ss { font-size: 11px; }
+  .ch { padding: 12px 13px; gap: 8px; flex-wrap: wrap; }
+  .ch .btn-row { width: 100%; }
+  .ch .btn-row .btn { flex: 1 1 150px; justify-content: center; }
+  .mfrow { grid-template-columns: 1fr; }
+  .modal { width: calc(100vw - 20px); max-width: none !important; max-height: 92vh; }
+  .mbody { padding: 14px; }
+  .mhead, .mfoot { padding-left: 14px; padding-right: 14px; }
+  .mfoot { flex-wrap: wrap; }
+  .mfoot .btn { flex: 1 1 130px; justify-content: center; }
+  .orc-form, .orc-preview { padding: 14px; }
+  .orc-card { padding: 12px 13px; min-width: 0; }
+  .orc-actions { width: 100%; }
+  .orc-actions .btn { flex: 1 1 110px; justify-content: center; }
+  .alert-row { align-items: flex-start; flex-wrap: wrap; padding: 12px 13px; }
+  .ar-info { min-width: 0; }
+  .notif-sub, .ar-name, .ar-type, .cn, .cs, .orc-title, .orc-sub { overflow-wrap: anywhere; word-break: break-word; }
+  .perfil-hero { padding: 18px 14px; }
+  .perfil-avcb { margin-left: 14px; margin-right: 14px; }
+  .perfil-obs { margin-left: 14px; margin-right: 14px; }
+  .tbl { min-width: 620px; }
+  .tbl th, .tbl td { padding-left: 12px; padding-right: 12px; }
   .tbl th:nth-child(2), .tbl td:nth-child(2),
   .tbl th:nth-child(4), .tbl td:nth-child(4) { display: none; }
+}
+
+@media(max-width:380px){
+  .tb { padding: 8px 7px; font-size: 11px; }
+  .sg { grid-template-columns: 1fr 1fr; }
+  .sc { padding: 12px 10px; }
+  .sv { font-size: 30px; }
 }
 
 /* scrollbar */
