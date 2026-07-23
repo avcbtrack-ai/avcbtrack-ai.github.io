@@ -2013,11 +2013,13 @@ function showToast(msg){
 
 // ═══ PERFIL DO CLIENTE ═══
 function abrirPerfil(id){
-  var c=DB.clientes().find(function(x){return x.id===id});
+  var clientes=DB.clientes();
+  var clienteIndex=clientes.findIndex(function(x){return x.id===id});
+  var c=clienteIndex>=0?clientes[clienteIndex]:null;
   if(!c)return;
   var d=getDaysLeft(c.venc);
   var st=getStatus(d);
-  var av=avC(DB.clientes().indexOf(c));
+  var av=avC(clienteIndex)||{bg:'rgba(204,27,27,.18)',cl:'var(--red)'};
 
   var daysLabel=d<0?'Vencido há '+Math.abs(d)+' dia(s)':d===0?'Vence hoje!':'Vence em '+d+' dia(s)';
   var daysNum=d<0?Math.abs(d)+'d':d+'d';
