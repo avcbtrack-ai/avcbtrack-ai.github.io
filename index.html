@@ -789,11 +789,11 @@ body.auth-locked .auth-gate { display:grid; }
     <button class="tb"    onclick="goTab('financeiro',this)">💰 Financeiro</button>
     <button class="tb"    onclick="goTab('orcamentos',this)">📄 Orçamentos</button>
     <button class="tb"    onclick="goTab('checklist',this)">📸 Checklist</button>
+    <div class="auth-top-actions">
+      <button class="btn b-ghost" onclick="ativarImpressaoDigital()">🔐 Ativar digital</button>
+      <button class="btn b-ghost" onclick="sairDoApp()">Sair</button>
+    </div>
     <div class="tb-right">
-      <div class="auth-top-actions">
-        <button class="btn b-ghost" onclick="ativarImpressaoDigital()">🔐 Ativar digital</button>
-        <button class="btn b-ghost" onclick="sairDoApp()">Sair</button>
-      </div>
       <input class="search" placeholder="🔍  Buscar cliente..." id="searchInput" oninput="filterClientes()">
     </div>
   </div>
