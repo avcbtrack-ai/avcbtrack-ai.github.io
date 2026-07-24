@@ -710,9 +710,56 @@ body::before {
 .orc-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 @media(max-width:980px){ .orc-grid { grid-template-columns: 1fr; } .orc-preview { min-height: 260px; } }
 @media(max-width:680px){ .orc-card { align-items:flex-start; flex-direction:column; } .orc-actions { justify-content:flex-start; } }
+
+/* --- ACESSO SEGURO --- */
+body.auth-locked .sidebar,
+body.auth-locked .main,
+body.auth-locked .botbar { display:none !important; }
+.auth-gate {
+  position:fixed; inset:0; z-index:99999; display:none; place-items:center;
+  padding:20px; background:radial-gradient(circle at top,#241010 0,#090909 55%);
+}
+body.auth-locked .auth-gate { display:grid; }
+.auth-card {
+  width:min(430px,100%); padding:30px; border-radius:14px;
+  background:#171717; border:1px solid #333; border-top:3px solid var(--red);
+  box-shadow:0 24px 70px rgba(0,0,0,.65);
+}
+.auth-brand { font-family:var(--f-display); font-size:34px; letter-spacing:1px; margin-bottom:6px; }
+.auth-brand em { color:var(--red); font-style:normal; }
+.auth-card > p { color:var(--muted); margin-bottom:22px; line-height:1.45; }
+.auth-card label { display:block; margin:13px 0 6px; color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+.auth-card input { width:100%; padding:13px 14px; color:var(--white); background:#222; border:1px solid #3b3b3b; border-radius:7px; outline:none; }
+.auth-card input:focus { border-color:var(--red); }
+.auth-card .btn { width:100%; justify-content:center; margin-top:12px; }
+.auth-help { margin-top:15px; text-align:center; color:var(--muted); font-size:12px; }
+.auth-msg { min-height:18px; margin-top:12px; color:#ff6868; text-align:center; font-size:12px; }
+.auth-top-actions { display:flex; gap:7px; margin-left:8px; }
+.auth-top-actions .btn { white-space:nowrap; padding:9px 11px; font-size:11px; }
+@media(max-width:800px){
+  .auth-top-actions { margin-left:0; }
+  .auth-top-actions .btn { padding:8px 9px; }
+  .auth-card { padding:24px 20px; }
+}
 </style>
 </head>
-<body>
+<body class="auth-locked">
+
+<!-- ACESSO -->
+<div class="auth-gate" id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-brand">AVCB<em>track</em></div>
+    <p>Entre para acessar seus clientes e vencimentos.</p>
+    <label for="auth-email">E-mail</label>
+    <input id="auth-email" type="email" autocomplete="username" placeholder="seu@email.com">
+    <label for="auth-password">Senha</label>
+    <input id="auth-password" type="password" autocomplete="current-password" placeholder="Sua senha" onkeydown="if(event.key==='Enter')entrarComSenha()">
+    <button class="btn b-red" onclick="entrarComSenha()">Entrar com e-mail e senha</button>
+    <button class="btn b-ghost" onclick="entrarComDigital()">🔐 Entrar com impressão digital</button>
+    <div class="auth-help">Use a impressão digital ou o PIN do celular.</div>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
 
 <!-- SIDEBAR -->
 <nav class="sidebar">
@@ -738,6 +785,10 @@ body::before {
     <button class="tb"    onclick="goTab('orcamentos',this)">📄 Orçamentos</button>
     <button class="tb"    onclick="goTab('checklist',this)">📸 Checklist</button>
     <div class="tb-right">
+      <div class="auth-top-actions">
+        <button class="btn b-ghost" onclick="ativarImpressaoDigital()">🔐 Ativar digital</button>
+        <button class="btn b-ghost" onclick="sairDoApp()">Sair</button>
+      </div>
       <input class="search" placeholder="🔍  Buscar cliente..." id="searchInput" oninput="filterClientes()">
     </div>
   </div>
@@ -1205,7 +1256,67 @@ body::before {
 // ═══════════════════════════════════════════════
 const SUPABASE_URL = "https://ecqcenkznwivsovnomjn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ZeGAsY811rEb2FFyZo2nTg_6wxzsee8";
-const supabaseClient = window.supabase ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const supabaseClient = window.supabase ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth:{ experimental:{ passkey:true } }
+}) : null;
+var appAutenticado=false;
+
+function authMensagem(msg,ok){
+  var el=document.getElementById('auth-msg');
+  if(el){el.textContent=msg||'';el.style.color=ok?'#3ddc84':'#ff6868'}
+}
+async function liberarAplicativo(){
+  appAutenticado=true;
+  document.body.classList.remove('auth-locked');
+  authMensagem('');
+  refreshAll();
+  await carregarClientesDaNuvem();
+  if(!DB.clientes().length) showToast('👋 Bem-vindo ao AVCBtrack! Cadastre seu primeiro cliente.');
+}
+async function entrarComSenha(){
+  if(!supabaseClient){authMensagem('Não foi possível conectar. Verifique a internet.');return}
+  var email=(document.getElementById('auth-email').value||'').trim();
+  var senha=document.getElementById('auth-password').value||'';
+  if(!email||!senha){authMensagem('Preencha o e-mail e a senha.');return}
+  authMensagem('Entrando...',true);
+  try{
+    var r=await supabaseClient.auth.signInWithPassword({email:email,password:senha});
+    if(r.error)throw r.error;
+    localStorage.setItem('avcb_ultimo_email',email);
+    document.getElementById('auth-password').value='';
+    await liberarAplicativo();
+  }catch(e){authMensagem('Não foi possível entrar: '+(e.message||'verifique seus dados.'))}
+}
+async function entrarComDigital(){
+  if(!supabaseClient){authMensagem('Não foi possível conectar. Verifique a internet.');return}
+  authMensagem('Confirme a impressão digital no celular...',true);
+  try{
+    var r=await supabaseClient.auth.signInWithPasskey();
+    if(r.error)throw r.error;
+    await liberarAplicativo();
+  }catch(e){
+    var msg=e&&e.message?e.message:'operação cancelada';
+    authMensagem('Não foi possível usar a impressão digital: '+msg);
+  }
+}
+async function ativarImpressaoDigital(){
+  if(!supabaseClient)return;
+  try{
+    var s=await supabaseClient.auth.getSession();
+    if(!s.data||!s.data.session){showToast('⚠ Entre com sua senha primeiro.');return}
+    showToast('🔐 Confirme a impressão digital no celular...');
+    var r=await supabaseClient.auth.registerPasskey();
+    if(r.error)throw r.error;
+    showToast('✅ Impressão digital ativada!');
+  }catch(e){showToast('⚠ Não foi possível ativar: '+(e.message||'operação cancelada'))}
+}
+async function sairDoApp(){
+  if(supabaseClient)await supabaseClient.auth.signOut();
+  appAutenticado=false;
+  document.body.classList.add('auth-locked');
+  document.getElementById('auth-password').value='';
+  authMensagem('');
+}
 
 // ═══════════════════════════════════════════════
 //  DATA LAYER
@@ -2185,8 +2296,14 @@ function refreshAll(){renderDashboard();renderNotifs();renderClientes();renderFi
 
 // ═══ INIT ═══
 window.onload=async function(){
-  refreshAll();
-  await carregarClientesDaNuvem();
+  var ultimo=localStorage.getItem('avcb_ultimo_email')||'';
+  var emailEl=document.getElementById('auth-email');
+  if(emailEl)emailEl.value=ultimo;
+  if(!supabaseClient){authMensagem('Não foi possível conectar. Verifique a internet.');return}
+  try{
+    var sessao=await supabaseClient.auth.getSession();
+    if(sessao.data&&sessao.data.session)await liberarAplicativo();
+  }catch(e){authMensagem('Não foi possível verificar o acesso. Tente novamente.')}
   if(!DB.clientes().length) showToast('👋 Bem-vindo ao AVCBtrack! Cadastre seu primeiro cliente.');
 };
 </script>
