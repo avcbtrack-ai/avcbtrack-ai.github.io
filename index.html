@@ -737,8 +737,13 @@ body.auth-locked .auth-gate { display:grid; }
 .auth-top-actions { display:flex; gap:7px; margin-left:8px; }
 .auth-top-actions .btn { white-space:nowrap; padding:9px 11px; font-size:11px; }
 @media(max-width:800px){
-  .auth-top-actions { margin-left:0; }
-  .auth-top-actions .btn { padding:8px 9px; }
+  .auth-top-actions {
+    position:fixed; right:12px; bottom:72px; z-index:5000;
+    margin-left:0; padding:7px; border:1px solid #3a3a3a;
+    border-radius:10px; background:rgba(18,18,18,.96);
+    box-shadow:0 8px 28px rgba(0,0,0,.55);
+  }
+  .auth-top-actions .btn { padding:9px 11px; }
   .auth-card { padding:24px 20px; }
 }
 </style>
