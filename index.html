@@ -592,6 +592,16 @@ body::before {
   .tbl th, .tbl td { padding-left: 12px; padding-right: 12px; }
   .tbl th:nth-child(2), .tbl td:nth-child(2),
   .tbl th:nth-child(4), .tbl td:nth-child(4) { display: none; }
+  .clientes-table-wrap { overflow-x: visible !important; }
+  .clientes-table { min-width: 0; table-layout: fixed; }
+  .clientes-table th:nth-child(3), .clientes-table td:nth-child(3),
+  .clientes-table th:nth-child(5), .clientes-table td:nth-child(5) { display: none; }
+  .clientes-table th:first-child, .clientes-table td:first-child { width: 58%; }
+  .clientes-table th:last-child, .clientes-table td:last-child { width: 42%; }
+  .clientes-table .chips { gap: 4px; justify-content: flex-end; }
+  .clientes-table .chip { padding: 7px 8px; font-size: 11px; }
+  .clientes-table .open-perfil, .clientes-table .open-check { display: none; }
+  .clientes-search { width: 100%; }
 }
 
 @media(max-width:380px){
@@ -844,9 +854,10 @@ body.auth-locked .auth-gate { display:grid; }
           <button class="chip cy" onclick="filterStatus('warn')">Atenção</button>
           <button class="chip cf" onclick="filterStatus('crit')">Críticos</button>
         </div>
+        <input class="search clientes-search" placeholder="🔍 Pesquisar por nome, telefone ou endereço..." id="clientesSearch" oninput="filterClientes(this)">
       </div>
-      <div style="overflow-x:auto;">
-        <table class="tbl">
+      <div class="clientes-table-wrap" style="overflow-x:auto;">
+        <table class="tbl clientes-table">
           <thead>
             <tr>
               <th>Cliente / Tipo</th>
@@ -1106,6 +1117,7 @@ body.auth-locked .auth-gate { display:grid; }
     <div class="mfoot">
       <button class="btn b-ghost" onclick="closeModal('modal-perfil')">Fechar</button>
       <button class="btn b-ghost" id="perfil-btn-edit" onclick="">✏ Editar</button>
+      <button class="btn b-ghost" id="perfil-btn-delete" onclick="">🗑 Excluir</button>
       <button class="btn b-red"   id="perfil-btn-vistoria" onclick="">📸 Iniciar Vistoria</button>
     </div>
   </div>
@@ -1211,6 +1223,7 @@ body.auth-locked .auth-gate { display:grid; }
     </div>
     <div class="mbody">
       <div class="field"><label>Cliente *</label>
+        <input id="f-cliente-busca" placeholder="🔍 Pesquisar cliente por nome, telefone ou endereço..." oninput="filtrarClientesCobranca(this.value)">
         <select id="f-cliente"><option value="">Selecione o cliente...</option></select>
       </div>
       <div class="field"><label>Descrição do Serviço *</label><input id="f-desc" placeholder="Ex: Renovação AVCB, Laudo, Vistoria..."></div>
@@ -1396,6 +1409,43 @@ async function salvarClienteNaNuvem(cliente){
   return data;
 }
 
+async function atualizarClienteNaNuvem(cliente){
+  if(!supabaseClient)return cliente;
+  var completo={
+    nome:cliente.nome,
+    tipo:cliente.tipo,
+    responsavel:cliente.resp,
+    telefone:cliente.tel,
+    area:cliente.area||null,
+    andares:cliente.andares||null,
+    endereco:cliente.end,
+    vencimento_avcb:cliente.venc,
+    obs:cliente.obs
+  };
+  var resultado = await supabaseClient
+    .from('clientes')
+    .update(completo)
+    .eq('id',cliente.id)
+    .select()
+    .single();
+  if(resultado.error){
+    resultado=await supabaseClient
+      .from('clientes')
+      .update({
+        nome:cliente.nome,
+        tipo:cliente.tipo,
+        responsavel:cliente.resp,
+        telefone:cliente.tel,
+        vencimento_avcb:cliente.venc
+      })
+      .eq('id',cliente.id)
+      .select()
+      .single();
+  }
+  if(resultado.error)throw resultado.error;
+  return resultado.data||cliente;
+}
+
 async function deletarClienteNaNuvem(id){
   if(!supabaseClient) return;
   const { error } = await supabaseClient
@@ -1431,6 +1481,7 @@ var TEMPLATE = [
 
 var currentCat=0, currentClienteId=null;
 var clFilters={status:'',search:''}, finFilter='';
+var editingClienteId=null;
 
 // ═══ NAV ═══
 function goPage(id,btn){
@@ -1455,7 +1506,12 @@ function goTab(id,btn){
 
 // ═══ MODALS ═══
 function openModal(id){
+  if(id==='modal-cliente'&&!editingClienteId) prepararNovoCliente();
   if(id==='modal-cobranca'||id==='modal-checklist'||id==='modal-orcamento-cliente') populateSelects();
+  if(id==='modal-cobranca'){
+    var busca=document.getElementById('f-cliente-busca');
+    if(busca)busca.value='';
+  }
   document.getElementById(id).classList.add('on');
 }
 function closeModal(id){document.getElementById(id).classList.remove('on')}
@@ -1505,13 +1561,42 @@ function daysChip(d){
 }
 
 // ═══ CLIENTES ═══
+function limparFormularioCliente(){
+  ['c-nome','c-resp','c-tel','c-area','c-andares','c-end','c-venc','c-obs'].forEach(function(f){
+    document.getElementById(f).value='';
+  });
+}
+function prepararNovoCliente(){
+  editingClienteId=null;
+  limparFormularioCliente();
+  document.querySelector('#modal-cliente .mhead h3').textContent='Novo Cliente';
+  document.querySelector('#modal-cliente .mfoot .b-red').textContent='Salvar Cliente';
+}
+function editarCliente(id){
+  var c=DB.clientes().find(function(x){return x.id===id});
+  if(!c)return;
+  editingClienteId=id;
+  document.getElementById('c-nome').value=c.nome||'';
+  document.getElementById('c-tipo').value=c.tipo||'Comercial';
+  document.getElementById('c-resp').value=c.resp||'';
+  document.getElementById('c-tel').value=c.tel||'';
+  document.getElementById('c-area').value=c.area||'';
+  document.getElementById('c-andares').value=c.andares||'';
+  document.getElementById('c-end').value=c.end||'';
+  document.getElementById('c-venc').value=c.venc||'';
+  document.getElementById('c-obs').value=c.obs||'';
+  document.querySelector('#modal-cliente .mhead h3').textContent='Editar Cliente';
+  document.querySelector('#modal-cliente .mfoot .b-red').textContent='Salvar Alterações';
+  closeModal('modal-perfil');
+  document.getElementById('modal-cliente').classList.add('on');
+}
 async function salvarCliente(){
   var nome=document.getElementById('c-nome').value.trim();
   var venc=document.getElementById('c-venc').value;
   if(!nome||!venc){showToast('⚠ Preencha nome e vencimento!');return}
 
   var cliente={
-    id:Date.now().toString(),
+    id:editingClienteId||Date.now().toString(),
     nome:nome,
     tipo:document.getElementById('c-tipo').value,
     resp:document.getElementById('c-resp').value.trim(),
@@ -1525,6 +1610,19 @@ async function salvarCliente(){
   };
 
   try{
+    if(editingClienteId){
+      await atualizarClienteNaNuvem(cliente);
+      var existentes=DB.clientes();
+      var pos=existentes.findIndex(function(c){return c.id===editingClienteId});
+      if(pos>-1)existentes[pos]=Object.assign({},existentes[pos],cliente);
+      DB.saveClientes(existentes);
+      limparFormularioCliente();
+      editingClienteId=null;
+      closeModal('modal-cliente');
+      showToast('✅ Cliente atualizado!');
+      await carregarClientesDaNuvem();
+      return;
+    }
     var salvo = await salvarClienteNaNuvem(cliente);
     cliente.id = String(salvo.id || cliente.id);
     cliente.criado = salvo.criado_em || salvo.created_at || cliente.criado;
@@ -1533,7 +1631,7 @@ async function salvarCliente(){
     cls.unshift(cliente);
     DB.saveClientes(cls);
 
-    ['c-nome','c-resp','c-tel','c-area','c-andares','c-end','c-venc','c-obs'].forEach(function(f){document.getElementById(f).value=''});
+    limparFormularioCliente();
     closeModal('modal-cliente');
     showToast('✅ Cliente salvo na nuvem!');
     await carregarClientesDaNuvem();
@@ -1556,7 +1654,9 @@ async function deleteCliente(id){
 }
 function renderClientes(){
   var cls=DB.clientes();
-  if(clFilters.search) cls=cls.filter(function(c){return c.nome.toLowerCase().indexOf(clFilters.search.toLowerCase())>-1});
+  if(clFilters.search) cls=cls.filter(function(c){
+    return [c.nome,c.tel,c.end,c.resp].join(' ').toLowerCase().indexOf(clFilters.search.toLowerCase())>-1;
+  });
   if(clFilters.status) cls=cls.filter(function(c){return getStatus(getDaysLeft(c.venc))===clFilters.status});
   var tbody=document.getElementById('clientes-tbody'),empty=document.getElementById('clientes-empty');
   if(!cls.length){tbody.innerHTML='';empty.style.display='flex';return}
@@ -1574,6 +1674,7 @@ function renderClientes(){
       +'<td>'+daysChip(d)+'</td>'
       +'<td>'+statusBadge(d)+'</td>'
       +'<td><div class="chips">'
+      +'<button class="chip open-edit" data-id="'+c.id+'">Editar</button>'
       +'<button class="chip open-perfil" data-id="'+c.id+'">👁 Ver</button>'
       +'<button class="chip open-check" data-id="'+c.id+'">📸</button>'
       +'<button class="chip cf open-del"  data-id="'+c.id+'">🗑</button>'
@@ -1602,7 +1703,19 @@ function renderClientes(){
   });
 }
 function filterStatus(s){clFilters.status=s;renderClientes()}
-function filterClientes(){clFilters.search=document.getElementById('searchInput').value;renderClientes()}
+function filterClientes(origem){
+  var valor=origem&&typeof origem.value==='string'?origem.value:'';
+  if(!origem){
+    var topo=document.getElementById('searchInput');
+    valor=topo?topo.value:'';
+  }
+  clFilters.search=valor;
+  ['searchInput','clientesSearch'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&el!==origem&&el.value!==valor)el.value=valor;
+  });
+  renderClientes();
+}
 
 // ═══ FINANCEIRO ═══
 function salvarCobranca(){
@@ -2030,7 +2143,11 @@ function renderItems(state,ci){
       thumbs='<div class="clthumbs">';
       var bgs=['background:linear-gradient(135deg,#1a3a1a,#0d200d)','background:linear-gradient(135deg,#3a1a1a,#200d0d)','background:linear-gradient(135deg,#1a1a3a,#0d0d20)'];
       var ems=['🧯','✅','⚠️','📸','🏷️'];
-      for(var p=0;p<st.photos;p++)thumbs+='<div class="thumb" style="'+bgs[p%3]+'">'+ems[p%5]+'</div>';
+      for(var p=0;p<st.photos;p++){
+        var foto=st.photoData&&st.photoData[p];
+        thumbs+=foto?'<div class="thumb" style="background-image:url('+foto+');background-size:cover;background-position:center"></div>'
+          :'<div class="thumb" style="'+bgs[p%3]+'">'+ems[p%5]+'</div>';
+      }
       thumbs+='<button class="tadd" onclick="addFoto(\''+key+'\')">＋</button></div>';
     }
     var note=(st.status==='bad'&&st.note)?'<div class="clnote">⚠ '+st.note+'</div>'
@@ -2047,14 +2164,53 @@ function markItem(key,status){
   var state=loadState();
   if(!state[key])state[key]={status:'pend',note:'',photos:0};
   state[key].status=status;
-  if(status!=='pend'&&!state[key].photos)state[key].photos=1;
   saveState(state);renderItems(state,currentCat);renderCats(state);updateProgress(state);
 }
 function addFoto(key){
-  var state=loadState();
-  if(!state[key])state[key]={status:'pend',note:'',photos:0};
-  state[key].photos=(state[key].photos||0)+1;
-  saveState(state);renderItems(state,currentCat);showToast('📸 Foto adicionada!');
+  var input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.setAttribute('capture','environment');
+  input.style.display='none';
+  document.body.appendChild(input);
+  input.addEventListener('change',function(){
+    var arquivo=input.files&&input.files[0];
+    if(!arquivo){input.remove();return}
+    compactarFoto(arquivo).then(function(dataUrl){
+      var state=loadState();
+      if(!state[key])state[key]={status:'pend',note:'',photos:0};
+      if(!state[key].photoData)state[key].photoData=[];
+      state[key].photoData.push(dataUrl);
+      state[key].photos=state[key].photoData.length;
+      saveState(state);
+      renderItems(state,currentCat);
+      updateProgress(state);
+      showToast('📸 Foto adicionada!');
+    }).catch(function(){
+      showToast('⚠ Não foi possível salvar a foto');
+    }).finally(function(){input.remove();});
+  });
+  input.click();
+}
+function compactarFoto(arquivo){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=function(){
+      var img=new Image();
+      img.onerror=reject;
+      img.onload=function(){
+        var max=1100,escala=Math.min(1,max/Math.max(img.width,img.height));
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(img.width*escala));
+        canvas.height=Math.max(1,Math.round(img.height*escala));
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',.72));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(arquivo);
+  });
 }
 function editNote(key){
   var txt=prompt('Descreva a não conformidade:');if(txt===null)return;
@@ -2183,6 +2339,16 @@ function abrirPerfil(id){
   }
 
   document.getElementById('perfil-body').innerHTML=html;
+  var btnE=document.getElementById('perfil-btn-edit');
+  btnE.dataset.clienteId=id;
+  btnE.onclick=function(){editarCliente(this.dataset.clienteId);};
+  var btnD=document.getElementById('perfil-btn-delete');
+  btnD.dataset.clienteId=id;
+  btnD.onclick=function(){
+    var clienteId=this.dataset.clienteId;
+    closeModal('modal-perfil');
+    deleteCliente(clienteId);
+  };
   var btnV=document.getElementById('perfil-btn-vistoria');
   btnV.dataset.clienteId=id;
   btnV.onclick=function(){closeModal('modal-perfil');editarChecklist(this.dataset.clienteId);};
@@ -2244,6 +2410,27 @@ function abrirBancoPDF(){
     req.onupgradeneeded=function(){var db=req.result;if(!db.objectStoreNames.contains('pdfs'))db.createObjectStore('pdfs',{keyPath:'id'})};
     req.onsuccess=function(){resolve(req.result)};req.onerror=function(){reject(req.error)};
   });
+  tbody.querySelectorAll('.open-edit').forEach(function(el){
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      editarCliente(this.getAttribute('data-id'));
+    });
+  });
+}
+function filtrarClientesCobranca(termo){
+  var select=document.getElementById('f-cliente');
+  if(!select)return;
+  var selecionado=select.value;
+  var busca=(termo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var clientes=DB.clientes().filter(function(c){
+    var texto=[c.nome,c.tel,c.end,c.resp].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return !busca||texto.indexOf(busca)>-1;
+  });
+  select.innerHTML='<option value="">Selecione o cliente...</option>';
+  clientes.forEach(function(c){
+    var o=document.createElement('option');o.value=c.id;o.textContent=c.nome;select.appendChild(o);
+  });
+  if(clientes.some(function(c){return c.id===selecionado}))select.value=selecionado;
 }
 async function guardarPDF(id,file){
   var db=await abrirBancoPDF();
